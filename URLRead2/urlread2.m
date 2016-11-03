@@ -357,8 +357,11 @@ end
 
 % Get the proxy information using MathWorks facilities for unified proxy
 % preference settings.
-mwtcp = com.mathworks.net.transport.MWTransportClientPropertiesFactory.create();
-proxy = mwtcp.getProxy();
+% mwtcp = com.mathworks.net.transport.MWTransportClientPropertiesFactory.create();
+% proxy = mwtcp.getProxy();
+
+% Get the proxy information using the MATLAB proxy API.
+proxy = com.mathworks.webproxy.WebproxyFactory.findProxyForURL(url); 
 
 % Open a connection to the URL.
 if isempty(proxy)
@@ -367,5 +370,9 @@ else
     urlConnection = url.openConnection(proxy);
 end
 
+userAgent = ['MATLAB R' version('-release') ' '  version('-description')];
+urlConnection.setRequestProperty('User-Agent', userAgent);
 
+%set the default authenticator to null to fix g999501
+java.net.Authenticator.setDefault([]);
 end
