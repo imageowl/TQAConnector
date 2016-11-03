@@ -684,7 +684,10 @@ classdef TQAConnection <matlab.mixin.SetGet
         
         function [format,userId] = parseUserInputArgs(~,varargin)
             p = getTQAInputParser();
+            p.addOptional('userId',[],@(x)validateattributes(x,{'numeric'},...
+                {'integer','positive','scalar'}))
             p.parse(varargin{:});
+            
             r = p.Results;
             format = r.format;
             userId = r.userId;
