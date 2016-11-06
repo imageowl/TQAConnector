@@ -41,12 +41,21 @@ classdef TQAConnection <matlab.mixin.SetGet
         PostImageRequest = tqaconnection.requests.TQAPostImageRequest();
     end %privateproperties
     
+    properties (Hidden)
+        useOKHTTP = false;
+    end 
+    
     methods
         function obj = TQAConnection(varargin)
             if ~isempty(varargin)
                 set(obj,varargin{:});
             end %if
         end %TQAConnection
+        
+        function set.useOKHTTP(obj,val)
+            validateattributes(val,{'logical'},{'scalar'});
+            obj.useOKHTTP = val;           
+        end %
         
         function val = get.Credentials(obj)
             val = obj.Credentials_;
@@ -578,6 +587,7 @@ classdef TQAConnection <matlab.mixin.SetGet
             obj.GetRequest.BaseURL = obj.BaseURL;
             obj.GetRequest.Credentials = obj.Credentials;
             obj.GetRequest.URLExtension = urlExt;
+            obj.GetRequest.useOKHTTP = obj.useOKHTTP;
             [response,status] = obj.GetRequest.execute(format);
         end %executeGetRequest
         
@@ -1300,6 +1310,8 @@ classdef TQAConnection <matlab.mixin.SetGet
             r = p.Results;
             format = r.format;
             data = r;
+            data.deviceTypes = num2cell(data.deviceTypes);
+            data.tests = num2cell(data.tests);
             data = rmfield(data,'format');            
         end %parseAddTemplate
         
