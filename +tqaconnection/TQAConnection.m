@@ -1336,6 +1336,7 @@ classdef TQAConnection <matlab.mixin.SetGet
             templateId = r.templateId;
             data = r;
             data = rmfield(data,{'format','templateId'});
+            
             %remove non-present fields
             checkFields = {'name','deviceTypes','active','description',...
                 'addTests','removeTests'};
@@ -1350,13 +1351,19 @@ classdef TQAConnection <matlab.mixin.SetGet
                 end %if
             end %if            
             
+            %this is to ensure that scalars are encoded as arrays in the
+            %input JSON string
             if isfield(data,'addTests') && isscalar(data.addTests)
                 data.addTests = {data.addTests};
             end %if
             
             if isfield(data,'removeTests') && isscalar(data.removeTests)
                 data.removeTests = {data.removeTests};
-            end %if            
+            end %if        
+            
+            if isfield(data,'deviceTypes') && isscalar(data.deviceTypes)
+                data.deviceTypes = {data.deviceTypes};
+            end %if
         end %parseModifyTemplateInputs
         
         function [format,group] = parseAddCustomGroupInput(~,varargin)
