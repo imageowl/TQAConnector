@@ -38,7 +38,7 @@ classdef TQAPostImageRequest < tqaconnection.requests.TQARequest
                 response = [];
                 return;
             end %if
-                               
+            
             %do the request
             [response,status] = obj.postIOImage();
             
@@ -184,7 +184,7 @@ classdef TQAPostImageRequest < tqaconnection.requests.TQARequest
             inputStream.close;
             byteArrayOutputStream.close;
             
-
+            
             charset = '';
             
             %Extraction of character set from Content-Type header if possible
@@ -199,7 +199,7 @@ classdef TQAPostImageRequest < tqaconnection.requests.TQARequest
             else
                 response = char(typecast(byteArrayOutputStream.toByteArray','uint8'));
             end
-
+            
             
             extras              = struct;
             extras.allHeaders   = allHeaders;
@@ -249,7 +249,6 @@ classdef TQAPostImageRequest < tqaconnection.requests.TQARequest
                             handler = sun.net.www.protocol.https.Handler;
                     end
                 catch ME
-                    disp(ME.message);
                     handler = [];
                 end
                 
@@ -266,8 +265,11 @@ classdef TQAPostImageRequest < tqaconnection.requests.TQARequest
                 
                 % Get the proxy information using MathWorks facilities for unified proxy
                 % preference settings.
-                mwtcp = com.mathworks.net.transport.MWTransportClientPropertiesFactory.create();
-                proxy = mwtcp.getProxy();
+                % mwtcp = com.mathworks.net.transport.MWTransportClientPropertiesFactory.create();
+                % proxy = mwtcp.getProxy();
+                
+                % Get the proxy information using the MATLAB proxy API.
+                proxy = com.mathworks.webproxy.WebproxyFactory.findProxyForURL(url);
                 
                 % Open a connection to the URL.
                 if isempty(proxy)
@@ -276,7 +278,11 @@ classdef TQAPostImageRequest < tqaconnection.requests.TQARequest
                     urlConnection = url.openConnection(proxy);
                 end
                 
+                userAgent = ['MATLAB R' version('-release') ' '  version('-description')];
+                urlConnection.setRequestProperty('User-Agent', userAgent);
                 
+                %set the default authenticator to null to fix g999501
+                java.net.Authenticator.setDefault([]);
             end
         end %postIOImage
     end %privatre methods
