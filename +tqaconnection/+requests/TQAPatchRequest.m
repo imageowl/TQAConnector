@@ -67,9 +67,12 @@ classdef TQAPatchRequest < tqaconnection.requests.TQARequest
             for n = 1:numel(headers)
                 rb.addHeader(headers(n).name,headers(n).value);               
             end %for
+            rb.addHeader('User-Agent',['MATLAB R' version('-release') ' '  version('-description')]);
             
             %...get the request object
             request= rb.build();
+            
+            java.net.Authenticator.setDefault([]);
             
             %use the client to execute the request
             okResp =client.newCall(request).execute();
