@@ -7,7 +7,7 @@ classdef TQAGetRequest < tqaconnection.requests.TQARequest
     end %Hidden properties
     
     properties (Constant)
-        JAVA_DEPENDENCIES = {'okio-1.10.0.jar','okhttp-3.4.1.jar'};   %Java JAR files that must be on the path for this claa
+        JAVA_DEPENDENCIES = {'okio-1.11.0.jar','okhttp-3.4.2.jar'};   %Java JAR files that must be on the path for this claa
     end
       
     methods 
