@@ -481,11 +481,21 @@ classdef TQAConnection <matlab.mixin.SetGet
             [response,status] = obj.executePatchRequest(urlExt,[],format);            
         end %startImageProcessing
         
+        function [response,status] = getUploadImageStatus(obj,scheduleId,varargin)
+            %getUploadImageStatus  Note that once schedules are finalized
+            %it appears that the upload images cannot be accessed even if
+            %they are still processing.
+            [format,scheduleId] = obj.parseGetUploadStatusInputs(...
+                scheduleId,varargin{:});
+            urlExt = ['/schedules/',int2str(scheduleId),'/upload-images'];
+            [response,status] = obj.executeGetRequest(urlExt,format); 
+        end %getUploadScheduleStatus
+        
         function [response,status] = uploadImages(obj,scheduleId,fileList,...
                 varargin)
             %uploadImages upload images for image processing
             [format,scheduleId,fileList,startProcessing,finalizeQA,...
-                verbose] = obj.parseIUploadImage(scheduleId,fileList,...
+                verbose] = obj.parseUploadImage(scheduleId,fileList,...
                 varargin{:});
             urlExt = ['/schedules/',int2str(scheduleId),'/upload-images'];
             response = cell(1,numel(fileList));
@@ -1173,8 +1183,19 @@ classdef TQAConnection <matlab.mixin.SetGet
             scheduleId = r.scheduleId;
         end %parseFinalizedReportinputs
         
+        function [format,scheduleId] = parseGetUploadStatusInputs(~,scheduleId,varargin)
+            p = getTQAInputParser();
+            p.addRequired('scheduleId',@(x)validateattributes(x,{'numeric'},...
+                {'scalar','positive','integer'})); 
+            p.parse(scheduleId,varargin{:});
+            r = p.Results;
+            format = r.format;
+            scheduleId = r.scheduleId;
+            
+        end %
+        
         function [format,scheduleId,fileList,startProcessing,finalizeQA,...
-                verbose] = parseIUploadImage(~,scheduleId,fileList,varargin)
+                verbose] = parseUploadImage(~,scheduleId,fileList,varargin)
             if ischar(fileList)
                 fileList = {fileList};
             end %if
@@ -1198,7 +1219,7 @@ classdef TQAConnection <matlab.mixin.SetGet
             startProcessing = r.startProcessing;
             finalizeQA = r.finalizeQA;
             verbose = r.verbose;
-        end %parseIUploadImage
+        end %parseUploadImage
         
         function format = parseGetTestsInput(~,varargin)
             p = getTQAInputParser();
