@@ -3,7 +3,9 @@ classdef TQAGetRequest < tqaconnection.requests.TQARequest
     %   Detailed explanation goes here
     
     properties 
-        useOKHTTP = false;
+        UseOKHTTP = false;
+        UseProxy = false;
+        Proxy = [];
     end %Hidden properties
     
     properties (Constant)
@@ -18,13 +20,27 @@ classdef TQAGetRequest < tqaconnection.requests.TQARequest
             end %if
         end %TQAGetRequest
         
-        function set.useOKHTTP(obj,val)
+        function set.UseOKHTTP(obj,val)
             validateattributes(val,{'logical'},{'scalar'});
-            obj.useOKHTTP = val;
+            obj.UseOKHTTP = val;
             if val
                 obj.addJavaDependencies();
             end %if
         end %
+        
+        function set.UseProxy(obj,val)
+            validateattributes(val,{'logical'},{'scalar'});
+            obj.UseProxy = val;
+        end %set.UseProxy
+        
+        function set.Proxy(obj,val)
+            if isempty(val)
+                obj.Proxy = [];
+                return;
+            end %if
+            validateattributes(val,{'tqaconnection.requests.Proxy'},{});
+            obj.Proxy = val;
+        end %set.UseProxy        
         
         function [response,status] = execute(obj,format)
             if nargin == 1
@@ -41,9 +57,18 @@ classdef TQAGetRequest < tqaconnection.requests.TQARequest
             %get the standard headers
             headers = obj.getStandardHeaders();
             
-            if obj.useOKHTTP %use the okhttp java library
+            if obj.UseOKHTTP %use the okhttp java library
                 %create the client
-                client = okhttp3.OkHttpClient();
+                cb = javaObject('okhttp3.OkHttpClient$Builder');
+                if obj.UseProxy
+                    if ~isempty(obj.Proxy)
+                        cb.proxy(obj.Proxy.getJavaProxy());
+                    else
+                        error('TQAPatchRequest:EmptyProxy',...
+                            'The Use Proxy attribute is set to true but the Proxy is empty');
+                    end %if
+                end %if
+                client = cb.build();
  
                 %build the request
                 rb = javaObject('okhttp3.Request$Builder');

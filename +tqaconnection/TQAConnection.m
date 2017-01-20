@@ -42,7 +42,9 @@ classdef TQAConnection <matlab.mixin.SetGet
     end %privateproperties
     
     properties (Hidden)
-        useOKHTTP = false;
+        UseOKHTTP = false;
+        UseProxy = false;
+        Proxy = [];
     end 
     
     methods
@@ -52,10 +54,24 @@ classdef TQAConnection <matlab.mixin.SetGet
             end %if
         end %TQAConnection
         
-        function set.useOKHTTP(obj,val)
+        function set.UseOKHTTP(obj,val)
             validateattributes(val,{'logical'},{'scalar'});
-            obj.useOKHTTP = val;           
+            obj.UseOKHTTP = val;           
         end %
+        
+        function set.UseProxy(obj,val)
+            validateattributes(val,{'logical'},{'scalar'});
+            obj.UseProxy = val;
+        end %set.UseProxy
+        
+        function set.Proxy(obj,val)
+            if isempty(val)
+                obj.Proxy = [];
+                return;
+            end %if
+            validateattributes(val,{'tqaconnection.requests.Proxy'},{});
+            obj.Proxy = val;
+        end %set.UseProxy         
         
         function val = get.Credentials(obj)
             val = obj.Credentials_;
@@ -597,7 +613,9 @@ classdef TQAConnection <matlab.mixin.SetGet
             obj.GetRequest.BaseURL = obj.BaseURL;
             obj.GetRequest.Credentials = obj.Credentials;
             obj.GetRequest.URLExtension = urlExt;
-            obj.GetRequest.useOKHTTP = obj.useOKHTTP;
+            obj.GetRequest.UseOKHTTP = obj.UseOKHTTP;
+            obj.GetRequest.UseProxy = obj.UseProxy;
+            obj.GetRequest.Proxy = obj.Proxy;
             [response,status] = obj.GetRequest.execute(format);
         end %executeGetRequest
         
@@ -653,6 +671,8 @@ classdef TQAConnection <matlab.mixin.SetGet
             obj.PatchRequest.Credentials = obj.Credentials;
             obj.PatchRequest.URLExtension = urlExt;            
             obj.PatchRequest.PostData = data;
+            obj.PatchRequest.UseProxy = obj.UseProxy;
+            obj.PatchRequest.Proxy = obj.Proxy;
             
             [response, status] = obj.PatchRequest.execute(format);            
         end %executePtachRequest
