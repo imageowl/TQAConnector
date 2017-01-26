@@ -68,6 +68,7 @@ classdef TQAPatchRequest < tqaconnection.requests.TQARequest
             
             %create the client
             cb = javaObject('okhttp3.OkHttpClient$Builder');
+            cb.retryOnConnectionFailure(true);
             if obj.UseProxy 
                 if ~isempty(obj.Proxy)
                     cb.proxy(obj.Proxy.getJavaProxy());
@@ -92,15 +93,31 @@ classdef TQAPatchRequest < tqaconnection.requests.TQARequest
             for n = 1:numel(headers)
                 rb.addHeader(headers(n).name,headers(n).value);               
             end %for
-            rb.addHeader('User-Agent',['MATLAB R' version('-release') ' '  version('-description')]);
-            
+            %rb.addHeader('User-Agent',['MATLAB R' version('-release') ' '  version('-description')]);
+            rb.addHeader('Connection','close');
             %...get the request object
             request= rb.build();
             
             java.net.Authenticator.setDefault([]);
             
             %use the client to execute the request
-            okResp =client.newCall(request).execute();
+            maxRetry =10;
+            attempts = 0;
+            callSuccess = false;
+            while ~callSuccess && attempts < maxRetry
+                try
+                    okResp =client.newCall(request).execute();
+                    callSuccess = true;
+                    
+                catch callErr
+                    callSuccess = false;
+                    attempts = attempts +1;
+                    if attempts < maxRetry
+                        disp('Retrying patch call');
+                    end %if
+                    disp(callErr);
+                end %catch
+            end 
             
             %build the expected status struct
             status.status.value = okResp.code;
