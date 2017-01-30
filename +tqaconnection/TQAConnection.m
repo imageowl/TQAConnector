@@ -473,8 +473,8 @@ classdef TQAConnection <matlab.mixin.SetGet
             [format,scheduleId] = obj.parseFinalizeReportInputs(scheduleId,...
                 varargin{:});
             
-            urlExt = ['/schedules/',int2str(scheduleId),'/add-results'];
-            [response,status] = obj.executePatchRequest(urlExt,[],format);
+            urlExt = ['/schedules/',int2str(scheduleId),'/finalize-results'];
+            [response,status] = obj.executePostRequest(urlExt,[],format);
         end %finalize report
         
         function [uploadSet,uploadStatus] = getUploadImageSetStatus(obj,...
@@ -493,8 +493,8 @@ classdef TQAConnection <matlab.mixin.SetGet
             [format,scheduleId] = obj.parseFinalizeReportInputs(scheduleId,...
                 varargin{:});
             
-            urlExt = ['/schedules/',int2str(scheduleId),'/upload-images'];
-            [response,status] = obj.executePatchRequest(urlExt,[],format);            
+            urlExt = ['/schedules/',int2str(scheduleId),'/start-processing'];
+            [response,status] = obj.executePostRequest(urlExt,[],format);            
         end %startImageProcessing
         
         function [response,status] = getUploadImageStatus(obj,scheduleId,varargin)
