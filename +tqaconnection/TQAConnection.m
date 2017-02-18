@@ -155,6 +155,25 @@ classdef TQAConnection <matlab.mixin.SetGet
             [machines,status] = obj.executeGetRequest(urlExt,format);            
         end %getMachines
         
+        function [machineIdx,status] = getMachineIDFromString(obj,sMachine)
+            %get the ID for a machine from its name
+            [machines,status] = obj.getMachines();
+            if ischar(sMachine)
+                sMachine = {sMachine};
+            end %if
+
+            [inList,idx] = ismember(sMachine,{machines.machines.name});
+            if all(~inList)
+                    machineIdx = [];
+                    status.isGood = false;
+                    status.status.msg = 'Machines specified cannot be found in the account';
+                    return;                
+            end %if
+            idx(idx==0) = 1;
+            machineIdx = [machines.machines(idx).id];
+            machineIdx(~inList) = NaN;
+        end %getMachineIDFromString
+        
         function [response,status] = requestNewMachine(obj,varargin)
             %requestNewMachine sends a new machine request to IO support
             format = obj.parseSiteMachineRequestInput(varargin{:});
@@ -221,8 +240,183 @@ classdef TQAConnection <matlab.mixin.SetGet
             %getReportData returns results for a particular reportId
             [format,reportId] = obj.parseReportDataInputArgs(reportId,varargin{:});  
             urlExt = ['/report-data/',int2str(reportId)];
-            [reportData,status] = obj.executeGetRequest(urlExt,format);                
+            
+            %get the data in a struct first
+            [reportData,status] = obj.executeGetRequest(urlExt,'struct');
+            
+            %putting report data into a more friendly forma                       
+            valStruct = reportData.reportData.values;
+            
+            if isempty(valStruct)
+                reportData.reportData.values = [];
+            else
+                varValueField = fieldnames(valStruct);
+                valField = cell(numel(varValueField),1);
+                nVar = 0;
+                for v =1:numel(varValueField)
+                    valField{v} = fieldnames(valStruct.(varValueField{v}));
+                    thisValFields = valField{v};
+                    for f = 1:numel(thisValFields);
+                        nVar = nVar+1;
+                        dataStruct(nVar) = valStruct.(varValueField{v}).(thisValFields{f}); %#ok<AGROW,SAGROW>
+                    end %for
+                    
+                end %for
+                reportData.reportData.values =dataStruct;
+            end %if
+            
+            %now reformat into originall requested format
+            reportData = tqaconnection.requests.TQARequest.formatResponse(...
+                reportData,status,format);
+         
         end %getReportData
+        
+        function data = getLongitudinalData(obj,scheduleId,variableId,varargin)
+            [format,scheduleIdx,testIdx,dateFilter,verbose] = ...
+                obj.parseLongitudinalDataInputArgs(scheduleId,variableId,...
+                varargin{:});
+            if verbose
+                disp(['Retrieving all reports for schedule: ',int2str(scheduleIdx)]);
+            end %if
+            [reports,reportStatus] = obj.getReports('schedule',scheduleIdx);
+            
+            nReport = numel(reports);
+            if verbose
+                disp(['Total Reports found: ',int2str(nReport)]);
+            end %if
+            collectionDates = cell(nReport,1);
+            for d = 1:nReport
+                %or ease of formatting going to trim the dates a bit to something
+                %easily recognizable.
+                collectionDates{d} = reports(d).collectionDate.date(1:19);
+            end %for
+            
+            % Filter the repports by date using date filter created from
+            % start and end dates
+            datesInRange = arrayfun(dateFilter,collectionDates,'UniformOutput',true);
+            reports = reports(datesInRange);
+            nInRangeReports = numel(reports);
+            if verbose
+                disp(['Number of reports in specified date range: ',int2str(nInRangeReports)]);
+            end %if
+            
+            %% Now go through the reports and pull the data
+            %...there are a number of energies in each report so the final number of
+            %   readings may be quite large. Preallocate and then we can trim afterwards
+            reportDataTable = cell(nInRangeReports*6,25);
+            %   columns:
+            % 1:reportID,2:collectionDate 3:collection TZ, 4:tolerance status, 5:report status,
+            % 6:reportComment, 7: machineID, 8:variableComment,9:recordID, 10:variableID
+            %11:variableName, 12: type, 13: value, 14:unit, 15: isAgregate, 16:isAdjusted
+            % 17:isEnergyDependent, 18:isChildValue, 19: parentVariableId, 20:
+            % isMultiFieldValue, 21:calibrationEnergy, 22:deviation,
+            % 23:isPercentageDeviation, 24: errorString, 25:infoString
+            %
+            sTestIdx = int2str(testIdx);
+            testFieldName = ['x0x3',sTestIdx(1),'_',sTestIdx(2:end)];
+            readings = 0;
+            for r =1:nInRangeReports
+                try
+                    [reportData,dataStatus] = obj.getReportData(reports(r).id);
+                    reportReadings = reportData.reportData.values;
+                    if isempty(reportReadings)
+                        if verbose
+                            disp(['Empty Report: ',int2str(reports(r).id)]);
+                        end %if
+                        continue;
+                    end %if
+                    reportReadings = reportReadings(ismember([reportReadings.variableId],testIdx));
+                    
+                    for f = 1:numel(reportReadings)
+                        
+                        readings = readings+1;
+                        reportDataTable{readings,1} = reportData.reportData.reportId;
+                        reportDataTable{readings,2} = reportData.reportData.collectedOn.date(1:19);
+                        reportDataTable{readings,3} = reportData.reportData.collectedOn.timezone;
+                        reportDataTable{readings,4} = reports(r).toleranceStatus;
+                        reportDataTable{readings,5} = reports(r).status;
+                        if isempty(reports(r).reportComment)
+                            reportDataTable{readings,6} ='';
+                        else
+                            reportDataTable{readings,6} = ['"',reports(r).reportComment,'"'];
+                        end %if
+                        reportDataTable{readings,7}=reportData.reportData.machine.id;
+                        if isstruct(reportData.reportData.variableComments) &&...
+                                isfield(reportData.reportData.variableComments,testFieldName)
+                            cellComments = reportData.reportData.variableComments.(testFieldName);
+                            varComments = '"';
+                            for c = 1:size(cellComments,1)
+                                if c >1
+                                    varComments = [varComments,'|']; %#ok<AGROW>
+                                end %if
+                                varComments = [varComments,cellComments{c,1}]; %#ok<AGROW>
+                            end %for
+                            varComments = [varComments,'"']; %#ok<AGROW>
+                        else
+                            varComments = '';
+                        end %if
+                        reportDataTable{readings,8}= varComments;
+                        reportDataTable{readings,9}= reportReadings(f).id;
+                        reportDataTable{readings,10}= reportReadings(f).variableId;
+                        reportDataTable{readings,11}= reportReadings(f).variableName;
+                        reportDataTable{readings,12}= reportReadings(f).type;
+                        if isequal(reportReadings(f).type,'numeric')
+                            reportDataTable{readings,13} =str2double(reportReadings(f).value);
+                        else
+                            reportDataTable{readings,13} =reportReadings(f).value;
+                        end %if
+                        reportDataTable{readings,14}= reportReadings(f).unit;
+                        reportDataTable{readings,15}= reportReadings(f).isAggregate;
+                        reportDataTable{readings,16}= reportReadings(f).isAdjusted;
+                        reportDataTable{readings,17}  =reportReadings(f).isEnergyDependent;
+                        reportDataTable{readings,18} = reportReadings(f).isChildValue;
+                        reportDataTable{readings,19} = reportReadings(f).parentVariableId;
+                        reportDataTable{readings,20} = reportReadings(f).isMultiFieldValue;
+                        if reportReadings(f).isEnergyDependent
+                            reportDataTable{readings,21}= reportReadings(f).calibrationEnergy.label;
+                        else
+                            reportDataTable{readings,21}= '';
+                        end %if
+                        reportDataTable{readings,22} = reportReadings(f).deviation;
+                        reportDataTable{readings,23} = reportReadings(f).isPercentageDeviation;
+                        reportDataTable{readings,24} = reportReadings(f).errorString;
+                        reportDataTable{readings,25} = reportReadings(f).infoString;
+                        if verbose
+                            disp(reportDataTable(readings,:));
+                        end %if
+                    end %for
+                    %
+                catch readErr
+                    if verbose
+                        disp(['Error Retrieving Data for report ',int2str(reports(r).id)]);
+                        disp(readErr.message);
+                    end %if
+                end %catch
+            end %for
+            
+            %truncate to the actual number of readings
+            reportDataTable = reportDataTable(1:readings,:);
+            
+            fieldNames = ...
+                {'reportID','collectionDate','collectionTZ','toleranceStatus','reportStatus',...
+                'reportComment','machineID','variableComment','recordID','variableID',...
+                'variableName','type','value','unit','isAggregate','isAdjusted',...
+                'isEnergyDependent','isChildValue','parentVariableId',...
+                'isMultiFieldValue','calibrationEnergy','deviation',...
+                'isPercentageDeviation','errorString','infoString'};
+            
+            switch format
+                case 'struct'
+                    data = cell2struct(reportDataTable,fieldNames,2);
+                case 'json'
+                    s = cell2struct(reportDataTable,fieldNames,2);
+                    data = savejson('longitudinal_data',s);
+                case 'table'
+                    data = cell2table(reportDataTable,...
+                        'VariableNames',fieldNames);
+            end %switch
+            
+        end %getLongitudinalData
         
         function [variableData,status] = getReportVariableData(obj,reportId,...
                 variableId,varargin)
@@ -263,6 +457,51 @@ classdef TQAConnection <matlab.mixin.SetGet
             end %if
             [schedules,status] = obj.executeGetRequest(urlExt,format);
         end %getScgedules
+        
+        function [scheduleIdx,status] = getScheduleIDFromString(...
+                obj,sSchedule,machineIdx)
+            %get the ID for a schedule from its name
+            
+            %having a machine idx will reduce ambiguities
+            if nargin == 2
+                machineIdx = [];
+                warning('TQAConnector:PossibleAmbiguousResults',...
+                    'Not specifying a machine id may result in ambiguous results');
+            end %if
+            
+            %...get all the schedules for the account
+            [schedules,status] = obj.getSchedules();
+            
+            if ischar(sSchedule)
+                sSchedule = {sSchedule};
+            end %if
+            
+            %...filter to just the schedules for the selected machine
+            if isempty(machineIdx)
+                machineSchedules = schedules.schedules;
+            else                
+                machineSchedules = schedules.schedules([schedules.schedules.machineId]==machineIdx);
+            end%if
+            
+            if isempty(machineSchedules)
+                scheduleIdx = [];
+                status.isGood = false;
+                status.status.msg = 'The list of machines is empty';
+                return;
+            end %if
+            
+            %...and  now get the schedule we are looking for
+            [inList,idx] = ismember(sSchedule,{machineSchedules.name});
+            if all(~inList)
+                scheduleIdx = [];
+                status.isGood = false;
+                status.status.msg = 'Schedules specified cannot be found in the list of schedules';
+                return;
+            end %if
+            idx(idx==0) = 1;
+            scheduleIdx = [machineSchedules(idx).id];       
+            scheduleIdx(~inList) = NaN;
+        end %getScheduleIDFromString
         
         function [response,status] = createSchedule(obj,machineId,templateId,...
                 varargin)
@@ -455,6 +694,35 @@ classdef TQAConnection <matlab.mixin.SetGet
             [scheduleVariables,status] = obj.executeGetRequest(urlExt,...
                 format);
         end %getScheduleVariables
+        
+        function [varIdx,status] = getVariableIDFromString(obj,sVar,scheduleIdx)
+            %Get the ID for schedule variable by its name
+            if ischar(sVar)
+                sVar = {sVar};
+            end %if
+            [scheduleVar,status] = obj.getScheduleVariables(scheduleIdx);
+            
+            if isempty(scheduleVar)
+                varIdx = [];
+                status.isGood = false;
+                status.status.msg = 'The list of variables is empty';
+                return;
+            end %if
+            
+            [inList,idx] = ismember(sVar,{scheduleVar.variables.name});
+            if all(~inList)
+                varIdx = [];
+                status.isGood = false;
+                status.status.msg = 'Variables specified cannot be found in the schedule';
+                return;
+            end %if
+            
+           idx(idx==0) = 1;
+           varIdx = [scheduleVar.variables(idx).id];       
+           varIdx(~inList) = NaN;
+                       
+        end %getVariableIDFromString
+        
         
         function [response,status] =uploadTestResults(obj,scheduleId,...
                 variableData,varargin)
@@ -741,6 +1009,66 @@ classdef TQAConnection <matlab.mixin.SetGet
             r = p.Results;
             format = r.format;
             reportId = r.reportId;            
+        end 
+        
+        function [format,scheduleId,variableId,dateFilter,verbose] = ...
+                parseLongitudinalDataInputArgs(~,scheduleId,variableId,...
+                varargin)
+            
+            p = getTQAInputParser();
+            p.addRequired('scheduleId',@(x)validateattributes(x,{'numeric'},...
+                {'integer','positive','scalar'}));
+            p.addRequired('variableId',@(x)validateattributes(x,{'numeric'},...
+                {'integer','positive','vector'}));
+            p.addOptional('dateStart','',...
+                @(x)validateattributes(x,{'char'},{'row'}));
+            p.addOptional('dateEnd','',...
+                @(x)validateattributes(x,{'char'},{'row'}));            
+            p.addOptional('dateFormat','',...
+                @(x)validateattributes(x,{'char'},{'row'}));
+            p.addOptional('verbose',false,@(x)validateattributes(...
+                x,{'logical'},{'scalar'}));
+            
+            p.parse(scheduleId,variableId,varargin{:});
+            r = p.Results;
+            format = r.format;
+            scheduleId = r.scheduleId;
+            variableId = r.variableId;
+            dateStart = r.dateStart;
+            dateEnd= r.dateEnd;
+            dateFormat = r.dateFormat;
+            verbose = r.verbose;
+           
+            %now make sure date is in correct format
+            dStart = getDatTimeFromString(dateStart,dateFormat);
+            dEnd = getDatTimeFromString(dateEnd,dateFormat);
+            
+            if isempty(dStart) && isempty(dEnd)
+                dateFilter = @(x)true; %take everything
+            elseif isempty(dStart) && ~isempty(dEnd)
+                dateFilter =@(x)x<=dateEnd;
+            elseif ~isempty(dStart) && isempty(dEnd)
+                dateFilter =@(x)x>=dStart;
+            else
+                dateFilter =@(x)x>=dStart&&x<=dEnd;
+            end %if
+                
+            
+            function dt = getDatTimeFromString(dtStr,dateFormat)
+                if isempty(dtStr)
+                    dt = [];
+                    return;
+                end %if
+                
+                if isempty(dateFormat)
+                    %no format specified- hopefully datetime will figure it out
+                    dt = datetime(dtStr);
+                else
+                    dt = datetime(dtStr,'InputFormat',dateFormat);
+                end %if
+                dt.Format = 'yyyy-MM-dd HH:mm:ss';
+                
+            end %getDateTimeFromString
         end 
         
         function [format,reportId,variableId]= parseReportVariableDataInputArgs(~,...
@@ -1118,8 +1446,13 @@ classdef TQAConnection <matlab.mixin.SetGet
                 varargin)
             if isstruct(variableData) %then assume its a single measurement
                 variableData = {variableData};
+               
             end %if
             
+            if isempty(variableData)
+                variableData = {'EMPTY'};
+            end %if
+                               
             p = getTQAInputParser();
             p.addRequired('scheduleId',@(x)validateattributes(x,{'numeric'},...
                 {'scalar','positive','integer'})); 
@@ -1151,6 +1484,12 @@ classdef TQAConnection <matlab.mixin.SetGet
             
             %do a more detailed look at the variable data
             %each array member should be a structure
+            
+            if isequal(r.variableData,{'EMPTY'})
+                outputData.variables =[];
+                return;
+            end %if
+            
             varIsStruct = cellfun(@isstruct,r.variableData,...
                 'UniformOutput',true);
             if ~all(varIsStruct)
