@@ -244,6 +244,14 @@ classdef TQACredentials < matlab.mixin.SetGet
                     credentials.APIKey = s.APIKey;
                 end %if
             end %if
+            
+            if isfield(s,'BaseURL')
+                credentials.BaseURL = s.BaseURL;
+            end %if
+            
+            if isfield(s,'OauthURL')
+                credentials.OauthURL= s.OauthURL;
+            end %if
         end %load from struct
         
         function credentials = loadJSON(json)
