@@ -165,7 +165,8 @@ classdef TQARequest < matlab.mixin.SetGet
                     
                     if status.isGood
                         fields = fieldnames(s);
-                        if ~isempty(fields) &&  isscalar(s) && isstruct(s.(fields{1}))
+                        if ~isempty(fields) && numel(fields)==1 ...
+                                &&  isscalar(s) && isstruct(s.(fields{1}))
                             structForTable = ...
                                 checkAndReplaceKeywordStructureFields(...
                                 s.(fields{1}));

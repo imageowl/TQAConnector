@@ -99,7 +99,11 @@ classdef TQACredentials < matlab.mixin.SetGet
         
         function val = get.AccessToken(obj)
             obj.checkAccessToken();
-            val = [obj.TokenType_,' ',obj.AccessToken_];           
+            if ~isempty(obj.AccessToken_)
+                val = [obj.TokenType_,' ',obj.AccessToken_];   
+            else
+                val = '';
+            end %if
         end %getAccessToken
         
         function val = get.Duration(obj)
