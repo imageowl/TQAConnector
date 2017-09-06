@@ -1148,6 +1148,8 @@ classdef TQAConnection <matlab.mixin.SetGet
                 {'integer','positive','scalar'}));
             p.addOptional('name','',@(x)validateattributes(x,{'char'},{'row','nonempty'}));
             p.addOptional('phoneNumber','**NOT PRESENT**',@(x)ischar(x));
+            p.addOptional('serialNumber','**NOT PRESENT**',@(x)ischar(x));
+            p.addOptional('internalNumber','**NOT PRESENT**',@(x)ischar(x));
             if ~isempty(varargin)
                 p.parse(machineId,varargin{:});
             else
@@ -1156,14 +1158,20 @@ classdef TQAConnection <matlab.mixin.SetGet
             r = p.Results;
             format = r.format; 
             machineId = r.machineId;
-            data = struct('name',r.name,'phoneNumber',r.phoneNumber);
+            data = struct('name',r.name,'phoneNumber',...
+                r.phoneNumber,'serialNumber',r.serialNumber,...
+                'internalNumber',r.internalNumber);
             if isempty(data.name)
                 data = rmfield(data,'name');
             end %if
             
-            if strcmp(data.phoneNumber,'**NOT PRESENT**')
-                data = rmfield(data,'phoneNumber');
-            end %if
+            optionalFields = {'phoneNumber','serialNumber','internalNumber'};
+            for f = 1:numel(optionalFields)
+                if strcmp(data.(optionalFields{f}),'**NOT PRESENT**')
+                    data = rmfield(data,optionalFields{f});
+                end %if
+            end %for
+        
         end %parseModifySiteInput    
                 
         function [format,filter,verbose] = parseReportInputArgs(~,varargin)
@@ -1382,28 +1390,42 @@ classdef TQAConnection <matlab.mixin.SetGet
                     error('TQAConnection:parseUploadSimpleDataInput',...
                         'each element of the variable data must have id and value fields');
                 end %if
-
+                
                 %they MAY have a metaItems field in which case each
                 %metaitem must have an id and value
                 
-                if isfield(r.variableData{v},'metaItems')
-                    if ~isstruct(r.variableData{v}.metaItems)
-                    error('TQAConnection:parseUploadSimpleDataInput',...
-                        'metaItems must be a struct with id and value fields');                        
+                if isfield(r.variableData{v},'metaItems')                   
+                    if isstruct(r.variableData{v}.metaItems)
+                        reqMetaItemFieldsPresent = ...
+                            isfield(r.variableData{v}.metaItems,{'id','value'});
+                        
+                        if ~all(reqMetaItemFieldsPresent)
+                            error('TQAConnection:parseUploadSimpleDataInput',...
+                                'metaItem datadata must have id and value fields');
+                        end %if
+                        if numel(r.variableData{v}.metaItems)== 1
+                            %becuase we need it in an array even if its
+                            %singular we need to change it to a cell
+                            c = r.variableData{v}.metaItems;
+                            r.variableData{v}.metaItems = {c};
+                        end %if
+                        
+                    elseif iscell(r.variableData{v}.metaItems)
+                        for m = 1:numel(r.variableData{v}.metaItems)
+                            reqMetaItemFieldsPresent = ...
+                                isfield(r.variableData{v}.metaItems{m},{'id','value'});
+                            if ~all(reqMetaItemFieldsPresent)
+                                error('TQAConnection:parseUploadSimpleDataInput',...
+                                    'metaItem datadata must have id and value fields');
+                            end %if
+                        end %for
                     end %if
                     
-                    reqMetaItemFieldsPresent = ...
-                        isfield(r.variableData{v}.metaItems,{'id','value'});
-                    if ~all(reqMetaItemFieldsPresent)
-                        error('TQAConnection:parseUploadSimpleDataInput',...
-                            'metaItem datadata must have id and value fields');
-                    end %if
-
                 end %if
-
+                
             end %for
             
-            outputData.variables = variableData;
+            outputData.variables = r.variableData;
         end %parseUploadSimpleDataInput
         
         function [format,scheduleId] = parseFinalizeReportInputs(~,...
