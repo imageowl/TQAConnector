@@ -258,7 +258,7 @@ classdef TQAConnection <matlab.mixin.SetGet
                     thisValFields = valField{v};
                     for f = 1:numel(thisValFields);
                         nVar = nVar+1;
-                        dataStruct(nVar) = valStruct.(varValueField{v}).(thisValFields{f}); %#ok<AGROW,SAGROW>
+                        dataStruct(nVar) = valStruct.(varValueField{v}).(thisValFields{f}); %#ok<AGROW>
                     end %for
                     
                 end %for
@@ -729,7 +729,32 @@ classdef TQAConnection <matlab.mixin.SetGet
             
             urlExt = '/custom-tests';
             [response,status] = obj.executePostRequest(urlExt,data,format); 
-        end %                
+        end %   
+        
+        function encodedFileAttachment= encodeFileAttachmentForUpload(~,fileName,variableId)
+            import java.io.File;
+            javaFile = java.io.File(java.lang.String(fileName));
+            
+            import java.nio.file.Files;
+            import java.nio.file.Path;
+            import java.nio.file.Paths;
+            source = java.nio.file.Paths.get(javaFile.toURI());
+            type = char(Files.probeContentType(source));
+            
+            encodedFileAttachment.id = variableId;
+            encodedFileAttachment.filename = fileName;
+            
+            %read in the file and encode as base 64
+            fid = fopen(fileName);
+            bytes = fread(fid,'int8=>int8');
+            fclose(fid);
+            
+            import org.apache.commons.codec.binary.Base64;
+            encodedBytes = char(java.lang.String(Base64.encodeBase64(bytes)));
+            
+            encodedFileAttachment.value = ['data:',type,';base64,',encodedBytes];
+            
+        end %encodeFileAttachmentForUpload
     end %methods
     
     methods (Access = private)
