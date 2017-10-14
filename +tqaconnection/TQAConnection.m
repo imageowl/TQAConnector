@@ -1107,8 +1107,8 @@ classdef TQAConnection <matlab.mixin.SetGet
         
         function [format,equipmentId,machineId] = parseCalibrationFactorsInput(~,equipmentId,varargin)
             p = getTQAInputParser();
-            p.addOptional('format','struct',...
-                @(x)any(validatestring(x,{'struct','json','table'})))
+            p.addRequired('equipmentId',@(x)validateattributes(x,{'numeric'},...
+                {'integer','positive','scalar'})); 
             p.addOptional('machineId',[],@(x)validateattributes(x,{'numeric'},...
                 {'integer','positive','scalar'}));            
             p.parse(equipmentId,varargin{:});
