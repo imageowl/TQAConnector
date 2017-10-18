@@ -504,7 +504,31 @@ classdef TQAConnection <matlab.mixin.SetGet
                 urlExt = '/documents';
             end %if
             urlExt = [urlExt,filter];
-            [documents,status] = obj.executeGetRequest(urlExt,format);  
+            [documents,status] = obj.executeGetRequest(urlExt,format); 
+            
+            %fix the links in the returns to get correct ampersand and other stuff in there
+            switch format
+                case 'struct'
+                    if isstruct(documents) &&...
+                            isfield(documents,'documents')
+                        for d = 1:numel(documents.documents)
+                            documents.documents(d).temporaryLink.path =...
+                                strrep(documents.documents(d).temporaryLink.path,...
+                                '\u0026','&');                    
+                        end %for
+                    end %if
+                        
+                case 'json'
+                    documents = strrep(documents,'\u0026','&'); 
+                    documents = strrep(documents,'\/','/'); 
+                case 'table'
+                    for r = 1:size(documents,1)
+                        tempLink = documents{r,'temporaryLink'};
+                        tempLink.path = strrep(tempLink.path,...
+                                '\u0026','&');
+                       documents{r,'temporaryLink'} = tempLink;    
+                    end %for
+            end 
         end %getDocuments
         
         function [calibrationFactors,status] = getCalibrationFactors(obj,equipmentId,varargin)
