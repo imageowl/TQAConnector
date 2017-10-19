@@ -244,31 +244,8 @@ classdef TQAConnection <matlab.mixin.SetGet
             %get the data in a struct first
             [reportData,status] = obj.executeGetRequest(urlExt,'struct');
             
-            %putting report data into a more friendly forma                       
-            valStruct = reportData.reportData.values;
-            
-            if isempty(valStruct)
-                reportData.reportData.values = [];
-            else
-                varValueField = fieldnames(valStruct);
-                valField = cell(numel(varValueField),1);
-                nVar = 0;
-                for v =1:numel(varValueField)
-                    valField{v} = fieldnames(valStruct.(varValueField{v}));
-                    thisValFields = valField{v};
-                    for f = 1:numel(thisValFields);
-                        nVar = nVar+1;
-                        dataStruct(nVar) = valStruct.(varValueField{v}).(thisValFields{f}); %#ok<AGROW>
-                    end %for
-                    
-                end %for
-                reportData.reportData.values =dataStruct;
-            end %if
-            
-            %now reformat into originall requested format
-            reportData = tqaconnection.requests.TQARequest.formatResponse(...
-                reportData,status,format);
-         
+            reportData = obj.postprocessReportData(reportData,status,format);
+
         end %getReportData
         
         function [logData,status] = getLongitudinalData(obj,scheduleId,varargin)
@@ -288,7 +265,8 @@ classdef TQAConnection <matlab.mixin.SetGet
                 reportId,variableId,varargin{:}); 
             urlExt = ['/report-data/',int2str(reportId),...
                 '/variables/',int2str(variableId)];
-            [variableData,status] = obj.executeGetRequest(urlExt,format);           
+            [variableData,status] = obj.executeGetRequest(urlExt,'struct');   
+            variableData = obj.postprocessReportData(variableData,status,format);
         end %getReportVariableData
         
         function [response,status] = executeCustomGetCall(obj,varargin)
@@ -1928,6 +1906,69 @@ classdef TQAConnection <matlab.mixin.SetGet
             
             
         end %parseCreateScheduleInput
+        
+        function reportData = postprocessReportData(~,reportData,status,format)
+            %putting report data into a more friendly forma                       
+            valStruct = reportData.reportData.values;
+            
+            if isempty(valStruct)
+                reportData.reportData.values = [];
+            else
+                varValueField = fieldnames(valStruct);
+                valField = cell(numel(varValueField),1);
+                nVar = 0;
+                for v =1:numel(varValueField)
+                    valField{v} = fieldnames(valStruct.(varValueField{v}));
+                    thisValFields = valField{v};
+                    for f = 1:numel(thisValFields);
+                        nVar = nVar+1;
+                        dataStruct(nVar) = valStruct.(varValueField{v}).(thisValFields{f}); %#ok<AGROW>
+                    end %for
+                    
+                end %for
+                reportData.reportData.values =dataStruct;
+            end %if
+            
+            %now reformat into originall requested format
+            reportData = tqaconnection.requests.TQARequest.formatResponse(...
+                reportData,status,format);
+         
+            %fix links in the reportdata
+            switch format
+                case 'struct'
+                    if isstruct(reportData) && ...
+                            isfield(reportData,'reportData') &&...
+                            numel(reportData.reportData.values) >0
+                        
+                        types = {reportData.reportData.values.type};
+                        for r = 1:numel(reportData.reportData.values)
+                            if isequal(types{r},'binary') % fix the &
+                                v = reportData.reportData.values(r).value;
+                                reportData.reportData.values(r).value =...
+                                    strrep(v, '\u0026','&'); 
+                            end %if
+                        end %for
+                    end %if
+                case 'json'
+                    reportData = strrep(reportData,'\u0026','&');
+                    reportData = strrep(reportData,'\/','/');
+                case 'table'
+                    reportVariables = reportData.Properties.VariableNames;
+                    if ismember('values',reportVariables)
+                        values = reportData.values;
+                        types = {values.type};
+                        for v = 1:numel(values)
+                            if isequal(types{v},'binary')
+                                binaryVal = values(v).value;
+                                values(v).value = strrep(binaryVal, '\u0026','&'); 
+                            end %if
+                            reportData.values = values;
+                        end %for
+                            
+                    end %if
+                                     
+            end %switch
+        end %
     end %private methods
     
 end
