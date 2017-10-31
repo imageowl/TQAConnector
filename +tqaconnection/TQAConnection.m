@@ -1279,8 +1279,8 @@ classdef TQAConnection <matlab.mixin.SetGet
             p.addOptional('active',1,@(x)validateattributes(x,{'numeric'},...
                 {'scalar','integer','>=',0,'<=',1}));
             p.addOptional('role','',...
-                @(x)any(validatestring(x,{'tqa_therapist','tqa_physicist',...
-                'tqa_administrator','tqa_physicist_administrator'})));
+                @(x)any(validatestring(x,{'therapist','physicist',...
+                'administrator','physicist_administrator'})));
             p.addOptional('notes','',@(x)ischar(x));
             p.addOptional('phoneNumber','',@(x)ischar(x));
             p.parse(varargin{:});
@@ -1305,8 +1305,8 @@ classdef TQAConnection <matlab.mixin.SetGet
             p.addOptional('active',-1,@(x)validateattributes(x,{'numeric'},...
                 {'scalar','integer','>=',0,'<=',1}));
             p.addOptional('role','**NOT PRESENT**',...
-                @(x)any(validatestring(x,{'tqa_therapist','tqa_physicist',...
-                'tqa_administrator','tqa_physicist_administrator'})));
+                @(x)any(validatestring(x,{'therapist','physicist',...
+                'administrator','physicist_administrator'})));
             p.addOptional('notes','**NOT PRESENT**',@(x)ischar(x));
             p.addOptional('phoneNumber','**NOT PRESENT**',@(x)ischar(x));
             p.parse(userId,varargin{:});
@@ -1325,6 +1325,10 @@ classdef TQAConnection <matlab.mixin.SetGet
                     data = rmfield(data,charFields{f});                   
                 end %if
             end %for
+            
+            if data.active == -1
+                data = rmfield(data,'active');
+            end %if
                 
         end %parseModifyUserInput
         
@@ -1369,7 +1373,7 @@ classdef TQAConnection <matlab.mixin.SetGet
             p.addRequired('variableData',@(x)validateattributes(x,{'cell'},{'vector'}));
             p.addOptional('date',datestr(now,'YYYY-mm-dd HH:MM'),...
                 @(x)validateattributes(x,{'char'},{'row'}));
-            p.addOptional('dateFormat','',...
+            p.addOptional('dateFormat','',... 
                 @(x)validateattributes(x,{'char'},{'row'}));
             p.addOptional('finalize',0,@(x)validateattributes(x,...
                 {'numeric'},{'scalar','integer','>=',0,'<=',1}));
