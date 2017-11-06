@@ -25,7 +25,7 @@ classdef TQAConnection <matlab.mixin.SetGet
   
     properties(Dependent)
         %Credentials A tqaconnection.TQACredentials object handling
-        %retriving  the access token from the TQA service
+        %retrieving  the access token from the TQA service
         Credentials;
         %Base URL: Base url of te TQA API service.
         BaseURL;

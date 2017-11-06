@@ -53,9 +53,10 @@ classdef TQAPatchRequest < tqaconnection.requests.TQARequest
             elseif ischar(obj.PostData)
                 %assume its JSON
                 %we need to make sure its just a vector- no line returns etc
-                s = loadjson(obj.PostData);
-                opt.Compact = 1;
-                postData = savejson('',s,opt);
+                postData = double(obj.PostData(:));
+                postData(postData <= 32) = [];
+                postData = char(postData);
+                postData = postData(:)';
             end %if      
                      
             if ~isempty(postData)
