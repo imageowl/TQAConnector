@@ -11,3 +11,5 @@ Several external libraries need to be installed and available on the MATLAB path
 Each call returns two variables , a response and a status. The reponse contains any data being retrieved or in the case of an error any details returned from the service. The status is a structure containing information on the headers, the final formed URL, the return codes and the overall status (isGood).
 The default format for the responses is a matlab structure. The response may be formatted as a JSON string or a MATLAB table by passing the P-V pair 'format',{'struct'}|'json','table
 
+[A tutorial for TQAConnector](https://docs.google.com/document/d/e/2PACX-1vTTxaSYClv6MhNcMix9M9Eu4yEkqiKOHosV8HOiEhrUvy0lgB3ICyelL-Va3ItnPp0uZaBDB-jhT-8B/pub)
+
