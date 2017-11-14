@@ -35,7 +35,7 @@ classdef TQAPostRequest < tqaconnection.requests.TQARequest
                 %assume its JSON
                 %we need to make sure its just a vector- no line returns etc
                 postData = double(obj.PostData(:));
-                postData(postData <= 32) = [];
+                postData(postData < 32) = [];
                 postData = char(postData);
                 postData = postData(:)';
 
