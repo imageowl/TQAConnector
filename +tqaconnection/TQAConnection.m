@@ -21,6 +21,10 @@ classdef TQAConnection <matlab.mixin.SetGet
     %The default format for the responses is a matlab structure. The
     %response may be formatted as a JSON string or a MATLAB rable by
     %passing the P-V pair 'format',{'struct'}|'json','table'
+    %
+    % <a href="matlab:
+    % web('https://docs.google.com/document/d/e/2PACX-1vTTxaSYClv6MhNcMix9M9Eu4yEkqiKOHosV8HOiEhrUvy0lgB3ICyelL-Va3ItnPp0uZaBDB-jhT-8B/pub')">TQAConnector Tutorial</a>.
+   
     
   
     properties(Dependent)
@@ -742,9 +746,12 @@ classdef TQAConnection <matlab.mixin.SetGet
             import java.nio.file.Paths;
             source = java.nio.file.Paths.get(javaFile.toURI());
             type = char(Files.probeContentType(source));
-            
+            if isempty(type)
+                type = 'application/unknown';
+            end %if
             encodedFileAttachment.id = variableId;
-            encodedFileAttachment.filename = fileName;
+            [~,fn,ext] = fileparts(fileName);
+            encodedFileAttachment.filename = [fn,ext];
             
             %read in the file and encode as base 64
             fid = fopen(fileName);
