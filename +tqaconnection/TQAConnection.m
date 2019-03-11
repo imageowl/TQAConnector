@@ -277,7 +277,7 @@ classdef TQAConnection <matlab.mixin.SetGet
             %executeCustomGetCall execute any arbitrary GET call to the API
             [format,urlExtension] = obj.parseCustomGetInputArgs(varargin{:});
             [response,status] = obj.executeGetRequest(urlExtension,format);  
-        end %executeCustomGetCall
+       end %executeCustomGetCall
         
         function [response,status] = executeCustomPostCall(obj,varargin)
              %executeCustomPostCall execute any arbitrary POST call to the API
@@ -563,6 +563,15 @@ classdef TQAConnection <matlab.mixin.SetGet
                 format);
         end %getScheduleVariables
         
+        function [response,status] = getScheduleAvailability(obj,...
+                scheduleId,varargin)
+            [format,scheduleId] = obj.parseGetScheduleAvailabilityInput(...
+                scheduleId,varargin{:});
+            urlExt = ['/schedules/',int2str(scheduleId),'/availability'];
+            [response,status] = obj.executeGetRequest(urlExt,...
+                format);
+        end %getScheduleAvailability
+        
         function [varIdx,status] = getVariableIDFromString(obj,sVar,scheduleIdx)
             %Get the ID for schedule variable by its name
             if ischar(sVar)
@@ -746,7 +755,7 @@ classdef TQAConnection <matlab.mixin.SetGet
             import java.nio.file.Paths;
             source = java.nio.file.Paths.get(javaFile.toURI());
             type = char(Files.probeContentType(source));
-            if isempty(type)
+            if isempty(type) || isequal(type,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
                 type = 'application/unknown';
             end %if
             encodedFileAttachment.id = variableId;
@@ -1362,6 +1371,18 @@ classdef TQAConnection <matlab.mixin.SetGet
             scheduleId = r.scheduleId;                        
         end %parseScheduleVariablesInput
         
+        function [format, scheduleId] = parseGetScheduleAvailabilityInput(~,...
+                scheduleId,varargin)
+            p = getTQAInputParser();
+            p.addRequired('scheduleId',@(x)validateattributes(x,{'numeric'},...
+                {'scalar','positive','integer'})); 
+            
+            p.parse(scheduleId,varargin{:});
+            r = p.Results;
+            format = r.format;
+            scheduleId = r.scheduleId;              
+        end 
+        
         function [format,scheduleId,outputData] =...
                 parseUploadSimpleDataInput(~,scheduleId,variableData,...
                 varargin)
@@ -1931,7 +1952,7 @@ classdef TQAConnection <matlab.mixin.SetGet
                 for v =1:numel(varValueField)
                     valField{v} = fieldnames(valStruct.(varValueField{v}));
                     thisValFields = valField{v};
-                    for f = 1:numel(thisValFields);
+                    for f = 1:numel(thisValFields)
                         nVar = nVar+1;
                         dataStruct(nVar) = valStruct.(varValueField{v}).(thisValFields{f}); %#ok<AGROW>
                     end %for
