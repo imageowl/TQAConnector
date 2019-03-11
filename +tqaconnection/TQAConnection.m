@@ -1406,6 +1406,8 @@ classdef TQAConnection <matlab.mixin.SetGet
             p.addOptional('finalize',0,@(x)validateattributes(x,...
                 {'numeric'},{'scalar','integer','>=',0,'<=',1}));
             p.addOptional('comment','',@(x)ischar(x));
+            p.addOptional('mode','save_append',...
+                @(x)any(validatestring(x,{'save_append','save_replace'})));
             p.parse(scheduleId,variableData,varargin{:});
             r= p.Results;
             format = r.format;
@@ -1423,6 +1425,7 @@ classdef TQAConnection <matlab.mixin.SetGet
             outputData.date = char(d);
             outputData.comment = r.comment;
             outputData.finalize = r.finalize;
+            outputData.mode = r.mode;
             
             %do a more detailed look at the variable data
             %each array member should be a structure
