@@ -613,6 +613,21 @@ classdef TQAConnection <matlab.mixin.SetGet
             [response,status] = obj.executePostRequest(urlExt,jsonData,format);
         end %uploadTestResults
         
+        function [response,status] = retrieveEquipmentHubResults(obj,...
+                scheduleId,varargin)
+            [format,scheduleId,variableId,outputData] = obj.parseEHResultsInputs(...
+                scheduleId,varargin{:});
+            
+            if isempty(variableId)
+                urlExt = ['/schedules/',int2str(scheduleId),'/equipment-hub-results'];
+            else
+                urlExt = ['/schedules/',int2str(scheduleId),'/variables/',...
+                    int2str(variableId),'/equipment-hub-results'];
+            end %if
+            [response,status] = obj.executePostRequest(urlExt,outputData,format);
+            
+        end %retrieveEquipmentHubResults
+        
         function [response,status] =finalizeReport(obj,scheduleId,varargin)
             %finalizeReport finalize an in progress report
             [format,scheduleId] = obj.parseFinalizeReportInputs(scheduleId,...
@@ -1490,6 +1505,56 @@ classdef TQAConnection <matlab.mixin.SetGet
             outputData.variables = r.variableData;
         end %parseUploadSimpleDataInput
         
+        function [format,scheduleId,variableId,outputData] = parseEHResultsInputs(...
+                ~,scheduleId,varargin)
+            
+            p = getTQAInputParser();
+            p.addRequired('scheduleId',@(x)validateattributes(x,{'numeric'},...
+                {'scalar','positive','integer'}));
+            p.addOptional('variableId',[],@(x)validateattributes(x,{'numeric'},...
+                {'scalar','positive','integer'}));
+            p.addOptional('date',datestr(now,'YYYY-mm-dd HH:MM'),...
+                @(x)validateattributes(x,{'char'},{'row'}));
+            p.addOptional('deviceDateFilter',datestr(now,'YYYY-mm-dd'),...
+                @(x)validateattributes(x,{'char'},{'row'}));
+            p.addOptional('dateFormat','',...
+                @(x)validateattributes(x,{'char'},{'row'}));
+            p.addOptional('deviceDateFilterFormat','yyyy-MM-dd',...
+                @(x)validateattributes(x,{'char'},{'row'}));
+            p.addOptional('finalize',0,@(x)validateattributes(x,...
+                {'numeric'},{'scalar','integer','>=',0,'<=',1}));
+            p.addOptional('comment','',@(x)ischar(x));
+            p.addOptional('mode','save_append',...
+                @(x)any(validatestring(x,{'save_append','save_replace'})));
+            
+            p.parse(scheduleId,varargin{:});
+            r= p.Results;
+            format = r.format;
+            scheduleId = r.scheduleId;  
+            variableId = r.variableId;
+            
+            %now let's make sure the date format is correct
+            if isempty(r.dateFormat)
+                %no format specified- hopefully datetime will figure it out
+                d = datetime(r.date); 
+            else
+                d = datetime(r.date,'InputFormat',r.dateFormat);
+            end %if
+            %...put it back out as string in correct format
+            d.Format = 'yyyy-MM-dd HH:mm'; 
+            outputData.date = char(d);       
+            
+            %handle the date filter
+            df = datetime(r.deviceDateFilter,'InputFormat',r.deviceDateFilterFormat);
+            df.Format = 'yyyy-MM-dd';
+            outputData.deviceDateFilter = char(df);
+            
+            outputData.comment = r.comment;
+            outputData.finalize = r.finalize;
+            outputData.mode = r.mode;
+            
+        end %parseEHResultsInputs
+        
         function [format,scheduleId] = parseFinalizeReportInputs(~,...
                 scheduleId,varargin)
             p = getTQAInputParser();
@@ -1582,6 +1647,8 @@ classdef TQAConnection <matlab.mixin.SetGet
                 {'>=',0,'<=',1,'scalar','integer'}));
             p.addOptional('description','',@(x)ischar(x));
             p.addOptional('serialNumber','',@(x)ischar(x));
+            p.addOptional('site',@(x)validateattributes(x,{'numeric'},...
+                {'integer','positive','scalar'})); 
             p.parse(name,type,status,varargin{:});
             r = p.Results;
             format = r.format;
@@ -1602,6 +1669,8 @@ classdef TQAConnection <matlab.mixin.SetGet
                 {'>=',0,'<=',1}));
             p.addOptional('description','**NOT PRESENT**',@(x)ischar(x));
             p.addOptional('serialNumber','**NOT PRESENT**',@(x)ischar(x));
+            p.addOptional('site',-1,@(x)validateattributes(x,{'numeric'},...
+                {'integer','positive','scalar'})); 
             p.parse(equipmentId,varargin{:});
             r = p.Results;
             format = r.format;
@@ -1610,7 +1679,7 @@ classdef TQAConnection <matlab.mixin.SetGet
             data = rmfield(data,{'format','equipmentId'});  
             
             %remove non-present fields
-            checkFields = {'name','type','status','description','serialNumber'};
+            checkFields = {'name','type','status','description','serialNumber','site'};
             for n = 1:numel(checkFields)
                 if ischar(data.(checkFields{n})) && ...
                         strcmp(data.(checkFields{n}),'**NOT PRESENT**')
