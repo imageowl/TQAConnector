@@ -1,5 +1,5 @@
-r.client_id = '202:OSU API Test';
-r.client_secret = 'f05ce749579e354046d3fcb5d271a600e7ba7afa29762787842806ac87fca131';
+r.client_id = 'your id';
+r.client_secret = 'your key';
 r.grant_type = 'client_credentials';
 %...display the body
 disp(savejson('',r));
